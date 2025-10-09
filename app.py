@@ -62,8 +62,15 @@ def create_category():
 @app.route('/category/<int:category_id>', methods=['DELETE'])
 def delete_category(category_id):
     global categories
+    # Знайти категорію
+    category = next((c for c in categories if c['id'] == category_id), None)
+    if category is None:
+        return jsonify({'error': 'Category not found'}), 404
+
+    # Видалити
     categories = [c for c in categories if c['id'] != category_id]
-    return jsonify({'message': f'Category {category_id} deleted'})
+
+    return jsonify({'message': f"Category '{category['name']}' deleted"})
 
 
 # ---------- RECORDS ----------
