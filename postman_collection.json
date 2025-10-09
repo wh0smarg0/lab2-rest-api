@@ -1,0 +1,53 @@
+{
+  "info": {
+    "name": "Expenses API Collection",
+    "_postman_id": "12345678-abcd-efgh-ijkl-1234567890ab",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Create User",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {
+          "mode": "raw",
+          "raw": "{ \"name\": \"Alice\" }"
+        },
+        "url": { "raw": "http://127.0.0.1:5000/user", "host": ["127.0.0.1"], "port": "5000", "path": ["user"] }
+      }
+    },
+    {
+      "name": "Get Users",
+      "request": { "method": "GET", "url": { "raw": "http://127.0.0.1:5000/users", "host": ["127.0.0.1"], "port": "5000", "path": ["users"] } }
+    },
+    {
+      "name": "Create Category",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {
+          "mode": "raw",
+          "raw": "{ \"name\": \"Food\" }"
+        },
+        "url": { "raw": "http://127.0.0.1:5000/category", "host": ["127.0.0.1"], "port": "5000", "path": ["category"] }
+      }
+    },
+    {
+      "name": "Create Record",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {
+          "mode": "raw",
+          "raw": "{ \"user_id\": 1, \"category_id\": 1, \"amount\": 150 }"
+        },
+        "url": { "raw": "http://127.0.0.1:5000/record", "host": ["127.0.0.1"], "port": "5000", "path": ["record"] }
+      }
+    },
+    {
+      "name": "Get Records by user_id",
+      "request": { "method": "GET", "url": { "raw": "http://127.0.0.1:5000/record?user_id=1", "host": ["127.0.0.1"], "port": "5000", "path": ["record"], "query": [{"key": "user_id", "value": "1"}] } }
+    }
+  ]
+}
