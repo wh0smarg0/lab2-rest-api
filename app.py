@@ -59,13 +59,11 @@ def create_category():
     return jsonify(new_category), 201
 
 
-@app.route('/category', methods=['DELETE'])
-def delete_category():
-    data = request.json
-    category_id = data.get('id')
+@app.route('/category/<int:category_id>', methods=['DELETE'])
+def delete_category(category_id):
     global categories
     categories = [c for c in categories if c['id'] != category_id]
-    return jsonify({'message': 'Category deleted'})
+    return jsonify({'message': f'Category {category_id} deleted'})
 
 
 # ---------- RECORDS ----------
