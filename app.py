@@ -1,125 +1,116 @@
 import os
+from flask import Flask, request
+from flask_smorest import Api, abort
+from flask_migrate import Migrate
+from db import db
+import models  # Обов'язково імпортуємо моделі для роботи міграцій
 
-from flask import Flask, request, jsonify
-from datetime import datetime
-
-app = Flask(__name__)
-
-# ----- Збереження даних у пам'яті -----
-users = []
-categories = []
-records = []
-
-# ---------- USERS ----------
-@app.route('/user/<int:user_id>', methods=['GET'])
-def get_user(user_id):
-    user = next((u for u in users if u['id'] == user_id), None)
-    if user:
-        return jsonify(user)
-    return jsonify({'error': 'User not found'}), 404
+# Імпортуємо схеми для валідації
+from schemas import UserSchema, CategorySchema, RecordSchema
 
 
-@app.route('/user/<int:user_id>', methods=['DELETE'])
-def delete_user(user_id):
-    global users
-    users = [u for u in users if u['id'] != user_id]
-    return jsonify({'message': 'User deleted'})
+def create_app():
+    app = Flask(__name__)
 
+    # Завантаження конфігурації з файлу config.py
+    app.config.from_pyfile('config.py', silent=True)
 
-@app.route('/user', methods=['POST'])
-def create_user():
-    data = request.json
-    new_user = {
-        'id': len(users) + 1,
-        'name': data.get('name')
-    }
-    users.append(new_user)
-    return jsonify(new_user), 201
+    db.init_app(app)
+    migrate = Migrate(app, db)
+    api = Api(app)
 
+    # ---------- USERS ----------
+    @app.route('/user', methods=['POST'])
+    def create_user():
+        user_data = UserSchema().load(request.json)
+        user = models.UserModel(**user_data)
+        try:
+            db.session.add(user)
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            abort(400, message="User with this name already exists.")
+        return UserSchema().dump(user), 201
 
-@app.route('/users', methods=['GET'])
-def get_users():
-    return jsonify(users)
+    @app.route('/user/<int:user_id>', methods=['GET'])
+    def get_user(user_id):
+        user = models.UserModel.query.get_or_404(user_id)
+        return UserSchema().dump(user)
 
+    # ---------- CATEGORIES (Variant 2) ----------
+    @app.route('/category', methods=['POST'])
+    def create_category():
+        category_data = CategorySchema().load(request.json)
+        # Якщо user_id не передано, категорія автоматично стане загальною (null в БД)
+        category = models.CategoryModel(**category_data)
+        try:
+            db.session.add(category)
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            abort(500, message="An error occurred while creating the category.")
+        return CategorySchema().dump(category), 201
 
-# ---------- CATEGORIES ----------
-@app.route('/category', methods=['GET'])
-def get_categories():
-    return jsonify(categories)
+    @app.route('/category', methods=['GET'])
+    def get_categories():
+        user_id = request.args.get('user_id', type=int)
 
+        # ЛОГІКА ВАРІАНТУ №2:
+        # Показуємо категорії, де user_id порожній (загальні)
+        # АБО де user_id збігається з ID користувача (приватні)
+        if user_id:
+            categories = models.CategoryModel.query.filter(
+                (models.CategoryModel.user_id == None) |
+                (models.CategoryModel.user_id == user_id)
+            ).all()
+        else:
+            # Якщо user_id не вказано — тільки загальні
+            categories = models.CategoryModel.query.filter_by(user_id=None).all()
 
-@app.route('/category', methods=['POST'])
-def create_category():
-    data = request.json
-    new_category = {
-        'id': len(categories) + 1,
-        'name': data.get('name')
-    }
-    categories.append(new_category)
-    return jsonify(new_category), 201
+        return CategorySchema(many=True).dump(categories)
 
+    # ---------- RECORDS ----------
+    @app.route('/record', methods=['POST'])
+    def create_record():
+        record_data = RecordSchema().load(request.json)
+        record = models.RecordModel(**record_data)
+        try:
+            db.session.add(record)
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            abort(400, message="Check if user_id and category_id exist.")
+        return RecordSchema().dump(record), 201
 
-@app.route('/category/<int:category_id>', methods=['DELETE'])
-def delete_category(category_id):
-    global categories
-    # Знайти категорію
-    category = next((c for c in categories if c['id'] == category_id), None)
-    if category is None:
-        return jsonify({'error': 'Category not found'}), 404
+    @app.route('/record/<int:record_id>', methods=['GET'])
+    def get_record(record_id):
+        record = models.RecordModel.query.get_or_404(record_id)
+        return RecordSchema().dump(record)
 
-    # Видалити
-    categories = [c for c in categories if c['id'] != category_id]
+    @app.route('/record', methods=['GET'])
+    def get_records():
+        user_id = request.args.get('user_id', type=int)
+        category_id = request.args.get('category_id', type=int)
 
-    return jsonify({'message': f"Category '{category['name']}' deleted"})
+        query = models.RecordModel.query
+        if user_id:
+            query = query.filter_by(user_id=user_id)
+        if category_id:
+            query = query.filter_by(category_id=category_id)
 
+        return RecordSchema(many=True).dump(query.all())
 
-# ---------- RECORDS ----------
-@app.route('/record/<int:record_id>', methods=['GET'])
-def get_record(record_id):
-    record = next((r for r in records if r['id'] == record_id), None)
-    if record:
-        return jsonify(record)
-    return jsonify({'error': 'Record not found'}), 404
+    # ---------- DELETE ----------
+    @app.route('/user/<int:user_id>', methods=['DELETE'])
+    def delete_user(user_id):
+        user = models.UserModel.query.get_or_404(user_id)
+        db.session.delete(user)
+        db.session.commit()
+        return {"message": "User deleted."}, 200
 
-
-@app.route('/record/<int:record_id>', methods=['DELETE'])
-def delete_record(record_id):
-    global records
-    records = [r for r in records if r['id'] != record_id]
-    return jsonify({'message': 'Record deleted'})
-
-
-@app.route('/record', methods=['POST'])
-def create_record():
-    data = request.json
-    new_record = {
-        'id': len(records) + 1,
-        'user_id': data.get('user_id'),
-        'category_id': data.get('category_id'),
-        'created_at': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        'amount': data.get('amount')
-    }
-    records.append(new_record)
-    return jsonify(new_record), 201
-
-
-@app.route('/record', methods=['GET'])
-def get_records():
-    user_id = request.args.get('user_id', type=int)
-    category_id = request.args.get('category_id', type=int)
-
-    if not user_id and not category_id:
-        return jsonify({'error': 'You must provide user_id or category_id'}), 400
-
-    filtered = records
-    if user_id:
-        filtered = [r for r in filtered if r['user_id'] == user_id]
-    if category_id:
-        filtered = [r for r in filtered if r['category_id'] == category_id]
-
-    return jsonify(filtered)
+    return app
 
 
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))  # Render дає свій PORT
-    app.run(host="0.0.0.0", port=port, debug=True)
+    app = create_app()
+    app.run(host="0.0.0.0", port=5000)
