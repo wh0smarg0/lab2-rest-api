@@ -5,6 +5,7 @@ class UserModel(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(128), unique=True, nullable=False)
     # Зв'язок з категоріями та записами
+    password = db.Column(db.String(256), nullable=False)
     categories = db.relationship("CategoryModel", back_populates="user", lazy="dynamic")
     records = db.relationship("RecordModel", back_populates="user", lazy="dynamic")
 
